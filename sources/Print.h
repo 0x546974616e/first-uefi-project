@@ -4,9 +4,15 @@
 #include "Format.h"
 
 #define TR_PRINT(FORMAT, ...) \
-  TrPrint(TR_L(FORMAT), __VA_ARGS__)
+  TrPrint(FORMAT, __VA_ARGS__)
 
 #define TR_PRINTLN(FORMAT, ...) \
+  TrPrint(FORMAT TR_CRLF, __VA_ARGS__)
+
+#define TR_LPRINT(FORMAT, ...) \
+  TrPrint(TR_L(FORMAT), __VA_ARGS__)
+
+#define TR_LPRINTLN(FORMAT, ...) \
   TrPrint(TR_L(FORMAT) TR_CRLF, __VA_ARGS__)
 
 VOID TrPrint(

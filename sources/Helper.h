@@ -3,6 +3,7 @@
 
 // Clang does not define `__null`.
 #define NULL ((void*) 0)
+#define SIZEOF sizeof
 #define VOLATILE volatile
 #define SIGNED signed
 #define STATIC static
@@ -12,6 +13,8 @@
 #define VA_START va_start
 #define VA_ARG va_arg
 #define VA_END va_end
+
+#define TR_DO(X) do { X } while(0)
 
 #define TR_L(X) TR_CONCAT(u, X)
 #define TR_CRLF TR_L("\r\n")
@@ -28,6 +31,7 @@
 /// Size of a static C-style array. Don't use on pointers!
 #define TR_ARRAYSIZE(ARRAY) ((size_t) (sizeof(ARRAY) / sizeof(*(ARRAY))))
 #define TR_STATIC_ASSERT(X) _Static_assert((X), "UEFI requirements")
+#define TR_NONNULL_ASSIGN(V, X) TR_DO(if ((V) != NULL) { *(V) = (X); })
 #define TR_VALUE_OR(VALUE, OR) (VALUE) ? (VALUE) : (OR)
 #define TR_SATURATING_SUB(X, Y) ((X) > (Y) ? (X) - (Y) : 0)
 #define TR_BIT_MASK(TYPE, N) (((TYPE)1 << (N)) - (TYPE)1)

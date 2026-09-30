@@ -37,6 +37,20 @@ INTN EFIAPI TrMemoryCompare(
   // if (sizeof (UINTN) == sizeof (UINT64)) {} else {}
   volatile UINT8 CONST* BufferA8 = (UINT8 CONST*) BufferA;
   volatile UINT8 CONST* BufferB8 = (UINT8 CONST*) BufferB;
-  while ((--Length != 0) && *(BufferA8++) != *(BufferB8++));
+  while ((--Length != 0) && *(BufferA8) == *(BufferB8)) {
+    ++BufferA8; ++BufferB8;
+  }
   return (INTN) (*BufferA8 - *BufferB8);
+}
+
+INTN EFIAPI TrStringCompare(
+  IN CHAR16 CONST* StringA,
+  IN CHAR16 CONST* StringB,
+  IN UINTN Length)
+{
+  return TrMemoryCompare(
+    (VOID CONST*) StringA,
+    (VOID CONST*) StringB,
+    Length * 2U
+  );
 }

@@ -17,9 +17,9 @@ VOID TrRunTests(VOID) {
   for (++X; X && X < &gTrTestSectionEnd; ++X) {
     if (X && X->Function && X->Name) {
       TR_UNIT_TEST_CODE Code = TrUnitTestSuccess;
-      TR_PRINTLN("Running %ls...", X->Name);
+      TR_LPRINTLN("Running %ls...", X->Name);
       (*X->Function)(&Code);
-      TR_PRINTLN("%ls: %ls\r\n", X->Name,
+      TR_LPRINTLN("  %ls: %ls", X->Name,
         Code == TrUnitTestSuccess
           ? TR_L( "Success" ) : TR_L( "Failed" ));
     }

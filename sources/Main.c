@@ -312,9 +312,6 @@ EFI_STATUS EFIAPI EfiMain(
 
   gST->ConOut->ClearScreen(gST->ConOut);
   Dada();
-  gST->ConOut->OutputString(gST->ConOut,
-    TR_L( "Hello World!" ) TR_CRLF);
-  g_dadafafa[TR_ARRAYSIZE(g_dadafafa) - 1] = 0;
   gST->ConOut->OutputString(gST->ConOut, g_dadafafa);
   TR_LOG_LITERAL("Type \"Test\" and press <Enter>.");
 

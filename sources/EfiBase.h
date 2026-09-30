@@ -38,7 +38,7 @@ TR_STATIC_ASSERT(sizeof(UINTN) == 8);
 /// Strings are stored in the UCS-2 encoding format as
 /// defined by Unicode 2.1 and ISO/IEC 10646 standards.
 typedef wchar_t CHAR16;
-typedef unsigned char CHAR8;
+typedef char CHAR8;
 
 #if __SIZEOF_WCHAR_T__ != 2
 #  error __SIZEOF_WCHAR_T__ != 2

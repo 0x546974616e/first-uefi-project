@@ -31,13 +31,27 @@
     FUNCTION, TR_CONCAT(FUNCTION, __COUNTER__), \
     TR_TEST_SECTION_MIDDLE)
 
-#define TR_TEST_ASSERT(X) do {                \
-    if (!(X)) {                               \
-      *_TrTestReturnCode = TrUnitTestFailure; \
-      TR_PRINTLN("Assertion failed: [%ls]",   \
-        TR_L(TR_STRINGIFY(X)));               \
-      return;                                 \
-    }                                         \
+#define TR_TEST_ASSERT(X) do {                 \
+    if (!(X)) {                                \
+      *_TrTestReturnCode = TrUnitTestFailure;  \
+      TR_LPRINTLN("  Assertion failed: [%ls]", \
+        TR_L(TR_STRINGIFY(X)));                \
+      return;                                  \
+    }                                          \
+  } while(0)
+
+#define TR_TEST_ASSERT_EQ(X, Y) do {                   \
+    if ((X) != (Y)) {                                  \
+      *_TrTestReturnCode = TrUnitTestFailure;          \
+      TR_LPRINTLN("  Assertion failed: %ls != %ls",    \
+        TR_L(TR_STRINGIFY(X)), TR_L(TR_STRINGIFY(Y))); \
+      return;                                          \
+    }                                                  \
+  } while(0)
+
+#define TR_TEST_FAILED() do {               \
+    *_TrTestReturnCode = TrUnitTestFailure; \
+    return;                                 \
   } while(0)
 
 #define TR_TEST(X)             \

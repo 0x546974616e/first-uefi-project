@@ -56,4 +56,10 @@ INTN EFIAPI TrMemoryCompare(
   IN UINTN Length
 );
 
+INTN EFIAPI TrStringCompare(
+  IN CHAR16 CONST* StringA,
+  IN CHAR16 CONST* StringB,
+  IN UINTN Length
+);
+
 #endif // TR_MEMORY_H

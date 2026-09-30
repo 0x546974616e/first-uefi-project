@@ -1,4 +1,5 @@
 #include "Format.h"
+#include "Unicode.h"
 #include "Memory.h"
 #include "Test.h"
 #include "Math.h"
@@ -153,14 +154,14 @@ STATIC VOID TrFormatParseLength(
   switch (**Format) {
     case TR_L( 'l' ):
       ++(*Format);
-      Context->Flags |= **Format == TR_L( 'l' )
+      Context->Length = **Format == TR_L( 'l' )
         ? (++(*Format), TR_FORMAT_LENGTH_LONG_LONG)
         : TR_FORMAT_LENGTH_LONG;
       break;
 
     case TR_L( 'h' ):
       ++(*Format);
-      Context->Flags |= **Format == TR_L( 'h' )
+      Context->Length = **Format == TR_L( 'h' )
         ? (++(*Format), TR_FORMAT_LENGTH_CHAR)
         : TR_FORMAT_LENGTH_SHORT;
       break;
@@ -168,7 +169,7 @@ STATIC VOID TrFormatParseLength(
     case TR_L( 't' ):
       ++(*Format);
       #ifdef TR_FORMAT_SUPPORT_PTRDIFF
-        Context->Flags |= sizeof(PTRDIFF_T) == sizeof(LONG)
+        Context->Length = sizeof(PTRDIFF_T) == sizeof(LONG)
           ? TR_FORMAT_LENGTH_LONG : TR_FORMAT_LENGTH_LONG_LONG;
       #endif
       break;
@@ -176,14 +177,14 @@ STATIC VOID TrFormatParseLength(
     case TR_L( 'j' ):
       ++(*Format);
       #ifdef TR_FORMAT_SUPPORT_INTMAX
-        Context->Flags |= sizeof(INTMAX_T) == sizeof(LONG)
+        Context->Length = sizeof(INTMAX_T) == sizeof(LONG)
           ? TR_FORMAT_LENGTH_LONG : TR_FORMAT_LENGTH_LONG_LONG;
       #endif
       break;
 
     case TR_L( 'z' ):
       ++(*Format);
-      Context->Flags |= sizeof(SIZE_T) == sizeof(LONG)
+      Context->Length = sizeof(SIZE_T) == sizeof(LONG)
         ? TR_FORMAT_LENGTH_LONG : TR_FORMAT_LENGTH_LONG_LONG;
       break;
 
@@ -204,23 +205,68 @@ STATIC VOID TrFormatConvertChar(
   (void) Character;
 }
 
-STATIC VOID TrFormatConvertString(
+STATIC VOID TrFormatConvertString8(
   IN TR_FORMAT_OUT_CALLBACK* Callback,
   IN OUT TR_FORMAT_CONTEXT CONST* Context,
-  IN VA_LIST* Args)
+  IN CHAR8 CONST* String)
 {
-  // TODO: %ls, %hs, %s
-  CHAR16 CONST* String = VA_ARG(*Args, CHAR16 CONST*);
-  if (String == NULL) {
-    String = TR_L( "(null)" );
-  }
+  (void) Callback;
+  (void) Context;
+  (void) String;
 
+  // TODO: Width & Precision
+  while (*String != TR_L( '\0' )) {
+    UINT32 CodePoint = 0U;
+    UINTN SequenceLength = 0U;
+    // TODO: 4U = Utf8StringLength = Out of bounds.
+    if (TrUtf8ToCodePoint(String, 4U, &SequenceLength, &CodePoint)) {
+      String += SequenceLength;
+      CHAR16 Utf16Bytes[2] = { 0x0 };
+      SequenceLength = TrCodePointToUtf16(CodePoint, Utf16Bytes);
+      if (SequenceLength >= 1U) {
+        TrFormatPutCharacter(Callback, Utf16Bytes[0]);
+        if (SequenceLength >= 2U) {
+          TrFormatPutCharacter(Callback, Utf16Bytes[1]);
+        }
+      }
+    } else {
+      ++String;
+    }
+  }
+}
+
+STATIC VOID TrFormatConvertString16(
+  IN TR_FORMAT_OUT_CALLBACK* Callback,
+  IN OUT TR_FORMAT_CONTEXT CONST* Context,
+  IN CHAR16 CONST* String)
+{
   // TODO: Width & Precision
   UINTN Index = 0U;
   UINTN Width = TR_VALUE_OR(Context->Width, (UINTN) -1);
   while (*String != TR_L( '\0' ) && Index < Width) {
     TrFormatPutCharacter(Callback, *String);
     ++String; ++Index;
+  }
+}
+
+STATIC VOID TrFormatConvertString(
+  IN TR_FORMAT_OUT_CALLBACK* Callback,
+  IN OUT TR_FORMAT_CONTEXT CONST* Context,
+  IN VA_LIST* Args)
+{
+  TR_FORMAT_LENGTH Length = Context->Length;
+  VOID CONST* String = VA_ARG(*Args, VOID CONST*);
+  if (String == NULL) {
+    String = TR_L( "(null)" );
+    Length = TR_FORMAT_LENGTH_NONE;
+  }
+
+  if (Context->Length == TR_FORMAT_LENGTH_SHORT) {
+    TrFormatConvertString8(Callback, Context,
+      (CHAR8 CONST*) String);
+  } else {
+    TrFormatConvertString16(Callback, Context,
+      (CHAR16 CONST*) String);
   }
 }
 
@@ -829,42 +875,97 @@ UINTN TrFormatV(
   return VariableBuffer.Index;
 }
 
-// ⚠️ NOTE: This macro contains side-effects.
-#define TR_FORMAT_ASSERT(EXPECTED, FORMAT, ...) do {   \
-    CHAR16 Buffer[128] = { 0x0 }; \
-    UINTN Written = TrFormat(Buffer, 128, TR_L( FORMAT ), __VA_ARGS__);          \
-    TR_TEST_ASSERT(0 == TrMemoryCompare(Buffer, TR_L( EXPECTED ), \
-       TR_MIN( sizeof(TR_L( EXPECTED )), 128 ))); \
+#define TR_FORMAT_ASSERT(EXPECTED, FORMAT, ...) do {                      \
+    CHAR16 Buffer[128] = { 0x0 };                                         \
+    UINTN ExpectedSize = SIZEOF(TR_L(EXPECTED)) / SIZEOF(CHAR16);         \
+    UINTN Written = TrFormat(Buffer, 128, TR_L(FORMAT), __VA_ARGS__);     \
+    if (Written != ExpectedSize || 0 != TrStringCompare(                  \
+        Buffer, TR_L(EXPECTED), TR_MIN(Written, 128))) {                  \
+      TR_LPRINTLN("  %hs: \"%*ls\"(%d) != \"%ls\"(%d)", __func__,         \
+        TR_MIN(Written, 128), Buffer, Written,                            \
+        TR_L(EXPECTED), ExpectedSize);                                    \
+      TR_TEST_FAILED();                                                   \
+    }                                                                     \
   } while(0)
 
 #include "Print.h"
 
 TR_TEST(TrTestFormatBinary) {
-  TrPrint(TR_L( "ICICI %d %d" ) TR_CRLF, 123, 456);
-
-  // TR_FORMAT_ASSERT("AZD", "%b", 0xA9);
-
-  // UINTN N = TrFormat(Buffer, 128, TR_L( "%b" ), 0xA9);
-  // TR_TEST_ASSERT(0 == TrMemoryCompare(Buffer, TR_L( "1" ), TR_MIN(128, N)));
-
-  // X2(TR_L(  "%b|\n" ), 0xA9);
-  // X2(TR_L(  "%#b|\n" ), 0xA9);
-  // X2(TR_L(  "%#10b|\n" ), 0xA9);
-  // X2(TR_L(  "%10b|\n" ), 0xA9);
-  // X2(TR_L(  "%.10b|\n" ), 0xA9);
-  // X2(TR_L(  "%10.10b|\n" ), 0xA9);
-
+  TR_FORMAT_ASSERT(  "10101001", "%b",      0xA9);
+  TR_FORMAT_ASSERT("0b10101011", "%#b",     0xAB);
+  TR_FORMAT_ASSERT("0b10101010", "%#10b",   0xAA);
+  TR_FORMAT_ASSERT("  10101001", "%10b",    0xA9);
+  TR_FORMAT_ASSERT("0010101001", "%.10b",   0xA9);
+  TR_FORMAT_ASSERT("0010101001", "%10.10b", 0xA9);
+  TR_FORMAT_ASSERT("000000011000000", "%.*b", 15, 0xC0);
+  TR_FORMAT_ASSERT("       11000000", "%*.b", 15, 0xC0);
 }
 
-    // X(TR_L(  "%06x|\n" ), 0x12B)
-    // X(TR_L( "%#06X|\n" ), 0x12C)
-    // X(TR_L(  "%#6x|\n" ), 0x12D)
-    // X(TR_L(  "%.6X|\n" ), 0x12E)
-    // X(TR_L(  "%i|\n" ),   123)
-    // X(TR_L(  "%i|\n" ),  -123)
-    // X(TR_L(  "%-i|\n" ), -123)
-    // X(TR_L(  "%+i|\n" ), -123)
-    // X(TR_L(  "% i|\n" ), -123)
-    // X(TR_L(  "% i|\n" ),  123)
-    // X(TR_L(  "%6.5i|\n" ),  123)
-    // X(TR_L(  "%.i|\n" ),  123)
+TR_TEST(TrTestFormatHexadecimal) {
+  TR_FORMAT_ASSERT("00012b|",  "%06x|", 0x12B);
+  TR_FORMAT_ASSERT("0x012C|", "%#06X|", 0x12C);
+  TR_FORMAT_ASSERT(" 0x12d|",  "%#6x|", 0x12D);
+  TR_FORMAT_ASSERT("00012E|",  "%.6X|", 0x12E);
+}
+
+TR_TEST(TrTestFormatDecimal) {
+  TR_FORMAT_ASSERT( "123",   "%i",   123);
+  TR_FORMAT_ASSERT( "123",   "%.i",  123);
+  TR_FORMAT_ASSERT("-123",   "%i",  -123);
+  TR_FORMAT_ASSERT("-123",   "%-i", -123);
+  TR_FORMAT_ASSERT("-123",   "%+i", -123);
+  TR_FORMAT_ASSERT("-123",   "% i", -123);
+  TR_FORMAT_ASSERT(" 123",   "% i",  123);
+  TR_FORMAT_ASSERT("+00123", "%+6.5i",  123);
+  TR_FORMAT_ASSERT("-00123", "%+6.5i", -123);
+  TR_FORMAT_ASSERT(" 00123",  "%6.5i",  123);
+}
+
+TR_TEST(TrTestFormatDoubleHexadecimal) {
+  TR_FORMAT_ASSERT(                                                              "0x1.9p-1|",      "%0a|", 0.78125);
+  TR_FORMAT_ASSERT(                                                          "0x1.90000p-1|",    "%0.5a|", 0.78125);
+  TR_FORMAT_ASSERT(                  "0x1.900000000000000000000000000000000000000000000p-1|",   "%0.45a|", 0.78125);
+  TR_FORMAT_ASSERT("                  0x1.900000000000000000000000000000000000000000000p-1|",  "%70.45a|", 0.78125);
+  TR_FORMAT_ASSERT("0x1.900000000000000000000000000000000000000000000p-1                  |", "%-70.45a|", 0.78125);
+  TR_FORMAT_ASSERT("0x0000000000000000001.900000000000000000000000000000000000000000000p-1|", "%070.45a|", 0.78125);
+
+  TR_FORMAT_ASSERT(             "-0x2p+1|",    "%.0a|", -3.14159);
+  TR_FORMAT_ASSERT("        -0x1.921fp+1|", "% 20.4a|", -3.14159);
+  TR_FORMAT_ASSERT("-0x1.921Fp+1        |", "%-20.4A|", -3.14159);
+  TR_FORMAT_ASSERT("-0x000000001.921Fp+1|", "%020.4A|", -3.14159);
+
+  TR_FORMAT_ASSERT("-0x1.921f9f01b866ep+1",   "%+a", -3.14159);
+  TR_FORMAT_ASSERT("+0x1.921f9f01b866ep+1",   "%+a",  3.14159);
+  TR_FORMAT_ASSERT(" 0x1.921f9f01b866ep+1",   "% a",  3.14159);
+  TR_FORMAT_ASSERT(              "-0x2p+1", "%+.0a", -3.14159);
+
+  TR_FORMAT_ASSERT( "0x1.921f9f01b866ep+1", "%a",  3.14159);
+  TR_FORMAT_ASSERT("-0x1.921f9f01b866ep+1", "%a", -3.14159);
+  TR_FORMAT_ASSERT( "0x1.21f9f01b866e4p-3", "%a",  0.14159);
+  TR_FORMAT_ASSERT( "0x1.E243F3E0370CEp+4", "%A", 30.14159);
+
+  TR_FORMAT_ASSERT(   "0x0p+0|",    "%a|", 0.0);
+  TR_FORMAT_ASSERT(  "0x0.p+0|",   "%#a|", 0.0);
+  TR_FORMAT_ASSERT(   "0x1p-1|",  "%.0a|", 0.654);
+  TR_FORMAT_ASSERT(  "0x1.p-1|", "%#.0a|", 0.654);
+  TR_FORMAT_ASSERT(   "0x1p-1|",  "%.0a|", 0.654);
+  TR_FORMAT_ASSERT("-0x1.8p+1|",   "%+a|", -3.0);
+  TR_FORMAT_ASSERT("-0x1.9p-4|", "%+.1a|", -0.1);
+
+  // TR_FORMAT_ASSERT(  " 0x1.0e7ad82221eecp-33",   "%22a", 0.000000000123);
+  // TR_FORMAT_ASSERT(  "0x1.0e7ad82221eecp-33 ",   "%-22a", 0.000000000123);
+  // TR_FORMAT_ASSERT(    "0x1.0e7bp-33         ", "%-22.4a", 0.000000000123);
+  // TR_FORMAT_ASSERT(            "0x1.0e7aep-33", "%-22.5a", 0.000000000123);
+  // TR_FORMAT_ASSERT(           "0x1.0e7ad8p-33", "%-22.6a", 0.000000000123);
+  // TR_FORMAT_ASSERT("0x000000000001.0e7ad8p-33", "%022.6a", 0.000000000123);
+
+  // 0x1.8p-1
+  // 0x1.90000p-1
+  // 0x0p+0
+  // 0x1p-33
+
+  // printf("%a\n", 0.75);
+  // printf("%0.5a\n", 0.78125);
+  // printf("%a\n", 0.0);
+  // printf("%.0a\n", 0.000000000123);
+}

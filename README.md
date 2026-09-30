@@ -1,10 +1,12 @@
 
-# TREFI
+# UEFI project
 
 First UEFI project with:
 - a mini test framework (DONE),
-- a custom printf/formatter (DONE),
-- a simple GUI using MicroUi (WIP).
+- a custom printf/formatter (WIP 70%),
+- a simple GUI using MicroUi (WIP 20%).
+
+![Example](Image.png)
 
 ## See
 
@@ -18,12 +20,3 @@ First UEFI project with:
 
 - OVMF CODE and VARS?
 - QEMU `-machine q35`?
-
-## Box Drawing
-
-```txt
-┌─┬┐  ╔═╦╗  ╓─╥╖  ╒═╤╕
-│ ││  ║ ║║  ║ ║║  │ ││
-├─┼┤  ╠═╬╣  ╟─╫╢  ╞═╪╡
-└─┴┘  ╚═╩╝  ╙─╨╜  ╘═╧╛
-```
